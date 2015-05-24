@@ -1,0 +1,110 @@
+---
+title: "Analysis for Motor Trend"
+author: "Michaela Schwaiger"
+date: "16 May 2015"
+output: pdf_document
+---
+
+##Executive Summary
+The aim of this study is to explore the relationship between a set of variables measured for different cars and miles per gallon (MPG). In particular, we adress the following two questions:
+
+- Is an automatic or manual transmission better for MPG?
+- What is the MPG difference between automatic and manual transmissions?
+
+Our results suggest that manual transmissions get better milage, with a difference to automatic transmission of about 2.9 mpg. However, we propose to conduct further experiments to fully answer these questions.
+
+##Main Analysis
+To answer the questions above, we would ideally obtain a dataset where the same car has been tested for miles per gallon fuel consumption with automatic and with manual transmission. We would test different brands and types of cars, changing only the transmission but keeping all other parameters constant. However, the only available dataset is the mtcars dataset.  Comparing fuel consumtion for the manual and automatic cars tested in this dataset, we find that manual cars can drive about 24 miles per gallon on average, while automatic cars only make it to 17 miles per gallon (Supplementary Figure 1), suggesting that cars with automatic transmission need more fuel. 
+However, the manual and automatic cars that were analyzed were of different brands and differ in many other ways as well.  Some of these differences, for example, the weight of the car, will surely also influence the fuel consumption. Indeed, we can see that heavier cars tend to have lower mpg, and unfortunately, that the cars with automatic and manual transmission are not equally distributed across car weights (Supplementary Figure 2). Therefore we will try to use a linear model to determine the relationship of fuel consumption to transmission, taking all possible confounding variables into account. To this end we first have to determine which other measurments we need to consider, and which ones we can leave out since they are not affecting milage or are dependent on variables we are already taking into account. Supplementary Figure 3 shows an overview of the mtcars dataset and the correlations among its variables. We can see that the biggest (negative) correlation with mpg is the weight of the cars, which is also not evenly distributed among manual and automatic cars. Therefore we definatly have to take weight into account. Sine weight correlates strongly with displacement,and it is not clear how this would affect the mileage of a car, we can omit this variable. The next group of variables contains the number of cylinders,horse power, V/S, carb and qsec. We will take horse power and 1/4 mile time (qsec) into account. Finally, we will take the gearing of the car into account by considering the rear axle ratio.       
+
+
+```{r,echo=FALSE}
+#load the data
+library(ggplot2)
+library(datasets)
+data(mtcars)
+```
+
+We first test if the inclusion of all these variables makes sense by fitting the linear model of predicting mpg by transmission type (am) alone and with adding more of the other variables. Then we perform an Anova on these models. The result below shows that we should definatly include weight, and also the horse power and 1/4 mile time (qsec), but the rear axle ratio does not seem to add anything in addition. 
+
+```{r,echo=FALSE}
+fit1 <- lm(mpg ~ am,data=mtcars)
+fit2 <- lm(mpg ~ am + wt,data=mtcars)
+fit3 <- lm(mpg ~ am + wt + hp + qsec ,data=mtcars)
+fit4 <- lm(mpg ~ am + wt + hp + qsec + drat,data=mtcars)
+anova(fit1,fit2,fit3,fit4)
+```
+
+Therefore we consider the 3rd model below.Looking at the summary of this model we estimate a (barely) significant 2.9 mpg increase in fuel efficency for a change from automatic transmission (am=0) to manual transmission (am=1), while holding the other variables constant.    
+
+```{r,echo=FALSE}
+summary(fit3)
+```
+
+These results suggest that manual transmissions get better milage, with a difference to automatic transmission of about 2.9 mpg. Looking at the diagnostic plots (Supplementary Figure 4) we notice that the residuals are higher for higher predicted values, suggesting that the prediction of mpg by the model is worse in that range. We also see that two cars have higher influence  on the model (and low residuals) than the other datapoints (Merc 230 and Maserati Bora).
+
+Due to these caveats, and since this effect of transmission on mpg is not highly significant, and actually not significant at all when considering models 2 or 4, we would highly recommend to generate a new daset as described in the beginning to be able to answer the questions above with certainty. 
+
+
+##Supplementary Figures:
+
+```{r,echo=FALSE}
+transmission <- as.factor(ifelse(mtcars$am==0, "automatic","manual"))
+boxplot(mtcars$mpg[transmission == "manual"],mtcars$mpg[transmission=="automatic"],notch =FALSE,col=c("blue","red"),names=c("manual","automatic"),ylab="miles per gallon (mpg)")
+mm <- mean(mtcars$mpg[transmission == "manual"])
+ma <- mean(mtcars$mpg[transmission == "automatic"])
+```
+
+Supplementary Figure 1: Boxplot comparing fuel consumption (measured in mpg) in manual and automatic transmission cars.
+
+```{r,echo=FALSE}
+
+p <- ggplot(mtcars, aes(x=wt, y=mpg, label=rownames(mtcars),col=transmission))
+p + geom_text(size=2)
+
+#qplot(x=mtcars$wt,y=mtcars$mpg,col=transmission,labels=rownames(mtcars))
+```
+
+Supplementary Figure 2: Comparison of fuel efficiency in mpg (y-axis) to car weight (x-axis). The datapoints are colored by transmission type.
+
+```{r, echo=FALSE,fig.height=20,fig.width=20}
+panel.hist <- function(x, ...) {
+  usr <- par("usr"); on.exit(par(usr))
+  par(usr = c(usr[1:2], 0, 1.5) )
+  h <- hist(x, plot = FALSE)
+  breaks <- h$breaks; nB <- length(breaks)
+  y <- h$counts; y <- y/max(y)
+  rect(breaks[-nB], 0, breaks[-1], y, col="gray", ...)
+}
+panel.cor <- function(x, y, digits=2, prefix="", cex.cor) {
+  usr <- par("usr"); on.exit(par(usr))
+  par(usr = c(0, 1, 0, 1))
+  r <- cor(x, y, use="pairwise.complete")
+  txt <- format(c(r, 0.123456789), digits=digits)[1]
+  txt2 <- format(c(abs(r), 0.123456789), digits=digits)[1]
+  txt <- paste(prefix, txt, sep="")
+  if(missing(cex.cor)) cex <- 0.8/strwidth(txt2)
+  text(0.5, 0.5, txt, cex = cex * abs(r))
+}
+mypoints <- function(x, y, n=3000, ...) {
+  ok <- which(is.finite(x) & is.finite(y))
+  if(length(ok)>n) ok <- sample(ok, n)
+  x <- x[ok]; y <- y[ok]
+  points(x, y, pch=".",cex=3)
+}
+mypoints2 <- function(...) {par(new=TRUE);smoothScatter(..., nrpoints=0)}
+
+
+pairs(mtcars, diag.panel=panel.hist, upper.panel=panel.cor, lower.panel=mypoints2,cex.labels=3)
+#pairs(mtcars, diag.panel=panel.hist, upper.panel=panel.cor, cex.axis=0.5,cex.labels=0.5)
+
+```
+
+Supplementary Figure 3: Pairwise correlations of all measurements in the mtcars dataset.
+
+```{r,echo=FALSE}
+par(mfrow=c(2,2))
+plot(fit3)
+```
+
+Supplementary Figure 4: Diagnostic plots of the linear model comparing mpg to transmission, taking weight, horse power, and 1/4 mile time (qsec) into account.
